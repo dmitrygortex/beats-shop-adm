@@ -3,11 +3,11 @@ pipeline {
 
     stages {
         stage('Cleanup') {
-                    steps {
-                        echo '========== CLEAN WORKSPACE =========='
-                        deleteDir()
-                    }
-                }
+            steps {
+                echo '========== CLEAN WORKSPACE =========='
+                deleteDir()
+            }
+        }
 
         stage('Clone') {
             steps {
@@ -26,29 +26,21 @@ pipeline {
             }
         }
 
-
-        stage('Docker Build') {
+        stage('Docker Compose Up') {
             steps {
-                echo '========== BUILD DOCKER IMAGE =========='
-                sh 'docker build -t beats-service:latest .'
+                echo '========== START INFRASTRUCTURE =========='
+                // Останавливаем старый стек
+                sh 'docker compose down || true'
+                // Поднимаем ВСЮ инфраструктуру из docker-compose.yml
+                sh 'docker compose up -d'
             }
         }
-
-        stage('Deploy') {
-            steps {
-                echo '========== DEPLOY BEATS SERVICE =========='
-                sh 'docker stop beats-service || true'
-                sh 'docker rm beats-service || true'
-                sh 'docker compose up -d --no-deps beats-service'
-            }
-        }
-
 
         stage('Health Check') {
             steps {
                 echo '========== HEALTH CHECK =========='
-                sh 'sleep 15'
-                sh 'curl -f http://beats-service:8080/api/beats/health || echo "Service starting..."'
+                sh 'sleep 20'
+                sh 'curl -f http://localhost:18080/api/beats/health || echo "Service starting..."'
                 sh 'docker compose ps'
             }
         }
@@ -56,7 +48,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ DEPLOYMENT SUCCESS!'
+            echo '✅ INFRASTRUCTURE UP BY JENKINS!'
         }
         failure {
             echo '❌ Deployment failed!'
