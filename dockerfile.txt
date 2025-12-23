@@ -227,4 +227,217 @@ docker network inspect beats-project_beats-net
 docker volume ls | grep beats-project
 ```
 
-**ВСЁ ГОТОВО ДЛЯ ЗАЧЁТА! 🚀**
+_________________
+___________________________________________________________________
+
+
+# Инструкция по развертыванию beats-shop-adm
+
+## 0. Очистка окружения
+
+Если требуется чистая установка, выполните:
+
+```bash
+docker stop $(docker ps -a -q)
+docker rm $(docker ps -a -q)
+docker network prune -f
+docker volume prune -f
+```
+
+## 1. Развертывание инфраструктуры
+
+### Запуск всех сервисов
+
+Перейдите в директорию проекта и запустите:
+
+```bash
+cd ~/Documents/adminka/beats-shop-adm
+docker compose up -d
+```
+
+Ожидайте 2-3 минуты для полной инициализации всех контейнеров.[1]
+
+### Проверка статуса контейнеров
+
+```bash
+docker ps
+```
+
+Должны быть запущены следующие сервисы:
+- jenkins (порт 8089)
+- beats-service (порт 18080)
+- rabbitmq (порт 15672)
+- prometheus (порт 9099)
+- grafana (порт 3009)
+
+### Получение начального пароля Jenkins
+
+```bash
+docker logs jenkins | grep -A 5 "Jenkins initial admin password"
+```
+
+## 2. Конфигурация Jenkins
+
+### Первоначальная настройка
+
+1. Откройте http://localhost:8089
+2. Введите пароль из логов
+3. Выберите "Install suggested plugins"
+4. Дождитесь завершения установки плагинов
+5. Создайте учетную запись администратора или пропустите этот шаг
+
+### Настройка учетных данных GitHub
+
+1. Перейдите в Manage Jenkins → Credentials → System → Global credentials
+2. Нажмите Add Credentials
+3. Заполните поля:
+   - Kind: Username with password
+   - Username: dmitrygortex
+   - Password: ваш GitHub Personal Access Token
+   - ID: github-token (обязательно указать точно)
+4. Сохраните
+
+### Создание Pipeline
+
+1. Создайте New Item с именем beats-shop-pipeline
+2. Выберите тип Pipeline
+3. В секции Pipeline установите Definition: Pipeline script
+4. Вставьте следующий скрипт:[2]
+
+```groovy
+pipeline {
+    agent any
+
+    stages {
+
+        stage('UPDATE FROM GIT') {
+            steps {
+                git credentialsId: 'github-token',
+                    url: 'https://github.com/dmitrygortex/beats-shop-adm.git',
+                    branch: 'main'
+            }
+        }
+
+        stage('GRADLE JAR') {
+            steps {
+                sh 'chmod +x gradlew'
+                sh './gradlew clean bootJar'
+            }
+        }
+
+        stage('DEPLOY') {
+            steps {
+                script {
+                sh 'docker compose stop beats-service || true'
+                sh 'docker rm -f beats-service || true'
+                sh 'docker compose up -d --build --no-deps beats-service'
+                }
+            }
+        }
+
+        stage('HEALTH') {
+            steps {
+                sh 'sleep 15'
+                sh 'curl -f http://host.docker.internal:18080/api/beats/health || echo "Service starting..."'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'DEPLOYMENT SUCCESS'
+        }
+        failure {
+            echo 'Deployment failed'
+        }
+    }
+}
+```
+
+5. Сохраните конфигурацию
+
+## 3. Запуск сборки
+
+### Первая сборка
+
+Нажмите Build Now в интерфейсе job. Первая сборка займет 5-7 минут из-за загрузки Gradle и зависимостей.
+
+### Верификация endpoints
+
+После успешной сборки проверьте:
+
+- Health check: http://localhost:18080/api/beats/health
+- Boss check: http://localhost:18080/api/beats/boss-check
+- Prometheus метрики: http://localhost:18080/actuator/prometheus
+- RabbitMQ UI: http://localhost:15672 (guest/guest)
+- Prometheus targets: http://localhost:9099/targets
+
+## 4. Настройка Grafana
+
+### Подключение к Grafana
+
+Откройте http://localhost:3009 с учетными данными admin/admin.[1]
+
+### Добавление Prometheus Data Source
+
+1. Перейдите в Connections → Data sources → Add data source
+2. Выберите Prometheus
+3. Укажите URL: http://prometheus:9090
+4. Нажмите Save & Test
+5. Убедитесь в успешном подключении
+
+### Импорт Dashboard
+
+1. Перейдите в Dashboards → New → Import
+2. Введите ID: 11378
+3. Выберите Prometheus data source
+4. Нажмите Import
+
+## 5. Демонстрация CI/CD
+
+### Модификация кода
+
+Измените файл BeatsController.java:
+
+```java
+@GetMapping("/boss-check")
+public ResponseEntity<String> bossCheck() {
+    return ResponseEntity.ok("Zachet demo version " + java.time.Instant.now());
+}
+```
+
+### Деплой изменений
+
+```bash
+git add .
+git commit -m "update boss-check"
+git push
+```
+
+Запустите Build Now в Jenkins и проверьте обновленный endpoint.
+
+## 6. Проверка требований
+
+### Docker Network
+```bash
+docker network ls
+docker network inspect beats-shop-adm_beats-net
+```
+
+### Docker Volumes
+```bash
+docker volume ls | grep beats-shop-adm
+```
+
+Должны присутствовать volumes для prometheus-data, grafana-data, jenkins_home, rabbitmq-data.[1]
+
+### Проверка всех компонентов
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+
+Все сервисы должны иметь статус Up.
+
+[1](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14034216/c0c85e2c-996f-444e-993f-8b966cf04882/docker-compose.yml)
+[2](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/14034216/8c47c3f2-3fbb-4046-b1c6-c48c2a705bba/Jenkinsfile)
