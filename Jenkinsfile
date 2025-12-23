@@ -36,7 +36,7 @@ pipeline {
         stage('> > > HEALTH') {
             steps {
                 sh 'sleep 15'
-                sh 'curl -f http://beats-service:8080/api/beats/health || echo "Service starting..."'
+                sh 'curl -f http://host.docker.internal:18080/api/beats/health || echo "Service starting..."'
             }
         }
     }
