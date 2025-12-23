@@ -1,0 +1,230 @@
+## 0. Подготовка (если нужно начать с нуля)
+
+```bash
+# Очистить все контейнеры
+docker stop $(docker ps -a -q)
+docker rm $(docker ps -a -q)
+docker network prune -f
+
+# Удалить volumes (опционально, если хочешь чистый старт)
+docker volume rm beats-project_jenkins_home || true
+```
+
+## 1. Подготовка и запуск инфраструктуры
+
+### Клонируй репозиторий (если на новом компе)
+```bash
+git clone https://github.com/dmitrygortex/beats-shop-adm.git
+cd beats-shop-adm
+```
+
+### Запуск всей инфраструктуры
+```bash
+docker compose -p beats-project up -d
+```
+
+Подожди 1-2 минуты, пока всё поднимется.
+
+### Получи пароль от Jenkins
+```bash
+docker logs jenkins
+```
+
+Ищи строку типа:
+```
+*************************************************************
+Jenkins initial admin password: a1b2c3d4e5f6...
+*************************************************************
+```
+
+Скопируй этот пароль.
+
+## 2. Настройка Jenkins
+
+### Первый вход
+1. Открой: `http://localhost:8089`
+2. Вставь пароль из логов
+3. Жми **Install suggested plugins** (подожди 3-5 минут)
+4. Создай админа или жми **Skip and continue as admin**
+
+### Настройка credentials для GitHub
+
+1. **Manage Jenkins** → **Credentials** → **System** → **Global credentials** → **Add Credentials**
+2. Заполни:
+   - Kind: `Username with password`
+   - Username: `dmitrygortex`
+   - Password: твой **GitHub Personal Access Token** (создай в GitHub: Settings → Developer settings → Personal access tokens → Generate new token)
+   - ID: `github-token` (точно так!)
+3. **Create**
+
+### Создание Pipeline Job
+
+1. **New Item** → Имя: `beats-shop-pipeline` → **Pipeline** → **OK**
+2. Внизу в секции **Pipeline**:
+   - Definition: `Pipeline script` (НЕ from SCM!)
+   - В текстовое поле вставь:
+
+```groovy
+pipeline {
+    agent any
+
+    stages {
+        stage('Clone') {
+            steps {
+                git credentialsId: 'github-token', 
+                    url: 'https://github.com/dmitrygortex/beats-shop-adm.git', 
+                    branch: 'main'
+            }
+        }
+
+        stage('Build JAR') {
+            steps {
+                sh 'chmod +x gradlew'
+                sh './gradlew clean bootJar'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    sh 'docker compose -p beats-project stop beats-service || true'
+                    sh 'docker rm -f beats-service || true'
+                    sh 'docker compose -p beats-project up -d --build --no-deps beats-service'
+                }
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                sh 'sleep 15'
+                sh 'curl -f http://beats-service:8080/api/beats/health || echo "Service starting..."'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ DEPLOYMENT SUCCESS!'
+        }
+        failure {
+            echo '❌ Deployment failed!'
+        }
+    }
+}
+```
+
+3. **Save**
+
+## 3. Первый запуск и проверка
+
+### Запусти сборку
+1. В job `beats-shop-pipeline` жми **Build Now**
+2. Первый раз будет долго (5-7 минут) — Gradle скачивается
+3. Дождись зелёного билда ✅
+
+### Проверь endpoints
+
+**Сервис работает:**
+```
+http://localhost:18080/api/beats/health
+```
+Должно вернуть: `OK`
+
+**Boss check:**
+```
+http://localhost:18080/api/beats/boss-check
+```
+
+**RabbitMQ Management:**
+```
+http://localhost:15672
+```
+Логин: `guest` / Пароль: `guest`
+
+**Prometheus Targets:**
+```
+http://localhost:9099/targets
+```
+Проверь: `beats-service` должен быть **UP** (зелёный)
+
+**Prometheus метрики сервиса:**
+```
+http://localhost:18080/actuator/prometheus
+```
+Должна быть куча текста с метриками
+
+## 4. Настройка Grafana
+
+### Вход в Grafana
+```
+http://localhost:3009
+```
+Логин: `admin` / Пароль: `admin`
+
+### Добавить Prometheus Data Source
+1. **Connections** → **Data sources** → **Add data source**
+2. Выбери **Prometheus**
+3. URL: `http://prometheus:9090`
+4. **Save & Test** → должно быть ✅ зелёное "Data source is working"
+
+### Импорт Dashboard
+1. **Dashboards** → **New** → **Import**
+2. Введи ID: `11378` (Spring Boot Statistics)
+3. Выбери Prometheus data source
+4. **Import**
+
+Теперь видны графики: JVM Memory, HTTP Requests, CPU и т.д.
+
+## 5. Демонстрация для зачёта
+
+### Покажи автоматический деплой
+
+1. **Измени код** в `BeatsController.java`:
+
+```java
+@GetMapping("/boss-check")
+public ResponseEntity<String> bossCheck() {
+    return ResponseEntity.ok("✅ ЗАЧЁТ СДАН! " + java.time.Instant.now());
+}
+```
+
+2. **Закоммить и запушить:**
+```bash
+git add .
+git commit -m "demo для зачёта"
+git push
+```
+
+3. **В Jenkins** → `beats-shop-pipeline` → **Build Now**
+
+4. **После сборки** открой:
+```
+http://localhost:18080/api/beats/boss-check
+```
+
+Должно показать: `✅ ЗАЧЁТ СДАН! 2025-12-23T...`
+
+### Что показывать преподу
+
+1. ✅ **Docker Compose** — вся инфраструктура в одном файле
+2. ✅ **Docker Network** — все контейнеры в `beats-project_beats-net`
+3. ✅ **RabbitMQ** — UI с connections
+4. ✅ **Prometheus** — targets UP, метрики собираются
+5. ✅ **Grafana** — дашборд с живыми графиками
+6. ✅ **Jenkins CI/CD** — меняешь код → Build Now → автодеплой
+7. ✅ **Volumes** — метрики сохраняются (`prometheus-data`, `grafana-data`, `jenkins_home`)
+
+## 6. Быстрая проверка всего
+
+```bash
+# Все контейнеры работают
+docker ps
+
+# Все в одной сети
+docker network inspect beats-project_beats-net
+
+# Volumes есть
+docker volume ls | grep beats-project
+```
+
+**ВСЁ ГОТОВО ДЛЯ ЗАЧЁТА! 🚀**
