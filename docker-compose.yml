@@ -1,0 +1,94 @@
+version: "3.8"
+
+services:
+  beats-service:
+    platform: linux/amd64
+    build: .
+    container_name: beats-service
+    environment:
+      # Чтобы локально/в контейнере не путаться:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+    ports:
+      - "18080:8080"
+    depends_on:
+      - rabbitmq
+    networks:
+      - beats-net
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    # наружу можно дать только UI (15672), amqp порт не публикуем
+    ports:
+      - "15672:15672"
+    command: >
+      sh -c "rabbitmq-plugins enable --offline rabbitmq_prometheus &&
+             rabbitmq-server"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - beats-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9099:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    depends_on:
+      - beats-service
+      - rabbitmq
+    networks:
+      - beats-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3009:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - beats-net
+
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins
+    ports:
+      - "8089:8080"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock  # Jenkins управляет Docker!
+    environment:
+      - JENKINS_ADMIN_PASSWORD=admin123
+    networks:
+      - beats-net
+    privileged: true  # Для Docker-in-Docker
+
+
+volumes:
+  rabbitmq-data:
+  prometheus-data:
+  grafana-data:
+  jenkins_home:
+
+networks:
+  beats-net:
+    driver: bridge
