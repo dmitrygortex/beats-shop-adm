@@ -69,6 +69,7 @@ services:
       context: .
       dockerfile: Dockerfile.jenkins
     container_name: jenkins
+    user: root
     ports:
       - "8089:8080"
     volumes:
@@ -78,7 +79,6 @@ services:
       - JENKINS_ADMIN_PASSWORD=admin123
     networks:
       - beats-net
-    privileged: true
 
 volumes:
   rabbitmq-data:
