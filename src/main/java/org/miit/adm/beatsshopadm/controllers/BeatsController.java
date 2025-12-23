@@ -22,7 +22,7 @@ public class BeatsController {
 
     @GetMapping("/boss-check")
     public ResponseEntity<String> bossCheck() {
-        return ResponseEntity.ok("Boss 2 approved: service running");
+        return ResponseEntity.ok("Boss 55 approved: service running");
     }
 
     @PostMapping("/buy/{beatId}")
