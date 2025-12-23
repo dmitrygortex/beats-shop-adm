@@ -29,12 +29,11 @@ pipeline {
         stage('Docker Compose Up') {
             steps {
                 echo '========== START INFRASTRUCTURE =========='
-                // Останавливаем старый стек
-                sh 'docker compose down || true'
-                // Поднимаем ВСЮ инфраструктуру из docker-compose.yml
-                sh 'docker compose up -d'
+                sh 'docker compose -f docker-compose.infra.yml down || true'
+                sh 'docker compose -f docker-compose.infra.yml up -d --build'
             }
         }
+
 
         stage('Health Check') {
             steps {
