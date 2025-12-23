@@ -17,12 +17,12 @@ public class BeatsController {
 
     @GetMapping("/health")
     public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Beats service healthy");
+        return ResponseEntity.ok("Beats 2 service healthy");
     }
 
     @GetMapping("/boss-check")
     public ResponseEntity<String> bossCheck() {
-        return ResponseEntity.ok("Boss approved: service running");
+        return ResponseEntity.ok("Boss 2 approved: service running");
     }
 
     @PostMapping("/buy/{beatId}")
