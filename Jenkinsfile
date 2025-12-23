@@ -2,11 +2,6 @@ pipeline {
     agent any
 
     stages {
-        stage('> > > DELETE DIR') {
-            steps {
-                deleteDir()
-            }
-        }
 
         stage('> > > UPDATE FROM GIT') {
             steps {
