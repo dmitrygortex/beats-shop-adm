@@ -2,16 +2,12 @@ FROM jenkins/jenkins:lts-jdk17
 
 USER root
 
-# 1) Установка Docker CLI
+# Установка Docker CLI
 RUN apt-get update && \
     apt-get install -y docker.io docker-compose && \
     rm -rf /var/lib/apt/lists/*
 
-# 2) Добавляем jenkins в docker группу, чтобы он мог дергать docker.sock
+# Добавим jenkins в docker группу
 RUN usermod -aG docker jenkins
-
-# 3) Чиним права на JENKINS_HOME (ключевой фикс)
-RUN mkdir -p /var/jenkins_home && \
-    chown -R jenkins:jenkins /var/jenkins_home
 
 USER jenkins

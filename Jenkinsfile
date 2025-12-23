@@ -26,28 +26,31 @@ pipeline {
             }
         }
 
-        stage('Docker Compose Up') {
+        stage('Rebuild Service') {
             steps {
-                echo '========== START INFRASTRUCTURE =========='
-                sh 'docker compose -f docker-compose.infra.yml down || true'
-                sh 'docker compose -f docker-compose.infra.yml up -d --build'
+                echo '========== REBUILD BEATS-SERVICE =========='
+                // Собираем новый образ
+                sh 'docker build -t beats-service:latest .'
+                // Останавливаем старый контейнер
+                sh 'docker stop beats-service || true'
+                sh 'docker rm beats-service || true'
+                // Запускаем новый из свежего образа
+                sh 'docker compose up -d beats-service'
             }
         }
-
 
         stage('Health Check') {
             steps {
                 echo '========== HEALTH CHECK =========='
-                sh 'sleep 20'
+                sh 'sleep 15'
                 sh 'curl -f http://localhost:18080/api/beats/health || echo "Service starting..."'
-                sh 'docker compose ps'
             }
         }
     }
 
     post {
         success {
-            echo '✅ INFRASTRUCTURE UP BY JENKINS!'
+            echo '✅ DEPLOYMENT SUCCESS!'
         }
         failure {
             echo '❌ Deployment failed!'

@@ -1,12 +1,9 @@
-version: "3.8"
-
 services:
   beats-service:
     platform: linux/amd64
     build: .
     container_name: beats-service
     environment:
-      # Чтобы локально/в контейнере не путаться:
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: guest
@@ -21,12 +18,11 @@ services:
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: rabbitmq
-    # наружу можно дать только UI (15672), amqp порт не публикуем
     ports:
       - "15672:15672"
     command: >
       sh -c "rabbitmq-plugins enable --offline rabbitmq_prometheus &&
-             rabbitmq-server"
+      rabbitmq-server"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -73,7 +69,6 @@ services:
       context: .
       dockerfile: Dockerfile.jenkins
     container_name: jenkins
-    user: root
     ports:
       - "8089:8080"
     volumes:
@@ -83,8 +78,7 @@ services:
       - JENKINS_ADMIN_PASSWORD=admin123
     networks:
       - beats-net
-
-
+    privileged: true
 
 volumes:
   rabbitmq-data:
