@@ -2,13 +2,13 @@ pipeline {
     agent any
 
     stages {
-        stage('Cleanup') {
+        stage('> > > DELETE DIR') {
             steps {
                 deleteDir()
             }
         }
 
-        stage('Clone') {
+        stage('> > > UPDATE FROM GIT') {
             steps {
                 git credentialsId: 'github-token',
                     url: 'https://github.com/dmitrygortex/beats-shop-adm.git',
@@ -16,14 +16,14 @@ pipeline {
             }
         }
 
-        stage('Build JAR') {
+        stage('> > > GRADLE JAR') {
             steps {
                 sh 'chmod +x gradlew'
                 sh './gradlew clean bootJar'
             }
         }
 
-        stage('Deploy') {
+        stage('> > > DEPLOY') {
             steps {
                 script {
                     sh 'docker compose -p beats-project stop beats-service || true'
@@ -33,7 +33,7 @@ pipeline {
             }
         }
 
-        stage('Health Check') {
+        stage('> > > HEALTH') {
             steps {
                 sh 'sleep 15'
                 sh 'curl -f http://localhost:18080/api/beats/health || echo "Service starting..."'
