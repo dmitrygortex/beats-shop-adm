@@ -2,10 +2,19 @@ pipeline {
     agent any
 
     stages {
-        stage('Checkout') {
+        stage('Cleanup') {
+                    steps {
+                        echo '========== CLEAN WORKSPACE =========='
+                        deleteDir()
+                    }
+                }
+
+        stage('Clone') {
             steps {
-                echo '========== CHECKOUT CODE =========='
-                checkout scm
+                echo '========== GIT CLONE =========='
+                git branch: 'main',
+                    credentialsId: 'github-token',
+                    url: 'https://github.com/dmitrygortex/beats-shop-adm.git'
             }
         }
 
