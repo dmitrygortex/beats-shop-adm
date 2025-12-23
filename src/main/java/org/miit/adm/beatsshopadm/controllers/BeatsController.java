@@ -17,7 +17,7 @@ public class BeatsController {
 
     @GetMapping("/health")
     public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Beats 2 service healthy");
+        return ResponseEntity.ok("Beats 2 service healthy"+ java.time.Instant.now());
     }
 
     @GetMapping("/boss-check")
