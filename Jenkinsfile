@@ -17,23 +17,6 @@ pipeline {
             }
         }
 
-        stage('Setup Docker') {
-            steps {
-                echo '========== INSTALL DOCKER CLI =========='
-                script {
-                    sh '''
-                        if ! command -v docker &> /dev/null; then
-                            echo "Docker not found, installing..."
-                            apt-get update && apt-get install -y docker.io docker-compose
-                            chmod 666 /var/run/docker.sock
-                        else
-                            echo "Docker already installed"
-                            docker --version
-                        fi
-                    '''
-                }
-            }
-        }
 
         stage('Docker Build') {
             steps {
