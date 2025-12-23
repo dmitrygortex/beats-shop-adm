@@ -26,9 +26,9 @@ pipeline {
         stage('> > > DEPLOY') {
             steps {
                 script {
-                    sh 'docker compose -p beats-project stop beats-service || true'
-                    sh 'docker rm -f beats-service || true'
-                    sh 'docker compose -p beats-project up -d --build --no-deps beats-service'
+                sh 'docker compose stop beats-service || true'
+                sh 'docker rm -f beats-service || true'
+                sh 'docker compose up -d --build --no-deps beats-service'
                 }
             }
         }
