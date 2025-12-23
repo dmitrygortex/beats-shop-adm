@@ -27,11 +27,12 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo '========== DEPLOY BEATS SERVICE =========='
-                sh 'docker compose stop beats-service || true'
-                sh 'docker compose rm -f beats-service || true'
-                sh 'docker compose up -d beats-service'
+                sh 'docker stop beats-service || true'
+                sh 'docker rm beats-service || true'
+                sh 'docker compose up -d --no-deps beats-service'
             }
         }
+
 
         stage('Health Check') {
             steps {
